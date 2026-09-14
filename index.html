@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
@@ -176,6 +176,24 @@
       '3. 網路連線是否正常</div>';
   }
 
+  function splitCsvLine(line){
+    // 簡易 CSV 欄位切割（版面通常不含逗號，足以用來偵測標題列）
+    return line.split(",").map(function(c){
+      return c.replace(/^"|"$/g, "").trim();
+    });
+  }
+
+  function trimToHeaderRow(csvText){
+    var lines = csvText.split(/\r\n|\n|\r/);
+    for(var i = 0; i < lines.length; i++){
+      var cells = splitCsvLine(lines[i]);
+      if(cells.indexOf(NAME_COL) > -1){
+        return lines.slice(i).join("\n");
+      }
+    }
+    return csvText; // 找不到就原樣返回，讓後續錯誤訊息提示使用者
+  }
+
   function detectCategoryColumns(fields){
     return fields.filter(function(f){ return EXCLUDE_COLS.indexOf(f) === -1 && f !== ""; });
   }
@@ -283,6 +301,7 @@
         return res.text();
       })
       .then(function(csvText){
+        csvText = trimToHeaderRow(csvText);
         var parsed = Papa.parse(csvText, { header:true, skipEmptyLines:true });
         if(!parsed.data || parsed.data.length === 0){
           throw new Error("試算表目前沒有可讀取的資料列。");
