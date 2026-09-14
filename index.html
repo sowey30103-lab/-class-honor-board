@@ -1,0 +1,321 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>班級榮譽榜</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --cover-navy:#16324F;
+    --cover-navy-deep:#0E2136;
+    --gold:#C9A227;
+    --gold-light:#E7CE79;
+    --paper:#FBF7EC;
+    --paper-2:#F3EDDB;
+    --paper-line:#E1D8BC;
+    --ink:#2B2620;
+    --ink-soft:#6B6252;
+    --stamp-red:#B23A2E;
+    --silver:#9AA3AC;
+    --bronze:#B8794A;
+    --focus:#2E6E7A;
+    --font-serif:'Noto Serif TC','Times New Roman',serif;
+    --font-sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    --font-mono:'JetBrains Mono','Noto Sans TC',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper-2);
+    background-image:linear-gradient(var(--paper-line) 1px, transparent 1px);
+    background-size:100% 32px;
+    font-family:var(--font-sans);
+    color:var(--ink);
+    min-height:100vh;
+    padding:24px 16px 64px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+  a{color:inherit;}
+
+  .cover{
+    background:linear-gradient(155deg,var(--cover-navy) 0%,var(--cover-navy-deep) 100%);
+    border-radius:14px;
+    padding:28px 28px 22px;
+    color:var(--paper);
+    box-shadow:0 10px 24px rgba(14,33,54,0.25);
+    opacity:0;transform:translateY(-6px);
+    animation:coverIn .55s ease forwards;
+  }
+  @media (prefers-reduced-motion: reduce){ .cover{animation:none;opacity:1;transform:none;} }
+  @keyframes coverIn{ to{opacity:1;transform:translateY(0);} }
+  .cover-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;color:var(--gold-light);opacity:.85;margin:0 0 6px;}
+  .cover h1{font-family:var(--font-serif);font-weight:700;font-size:clamp(24px,4vw,32px);margin:0 0 4px;}
+  .cover p.sub{margin:0;font-size:13px;color:#CBD8E0;max-width:60ch;line-height:1.6;}
+  .sync-row{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap;}
+  .sync-status{font-family:var(--font-mono);font-size:11.5px;color:#CBD8E0;}
+  .refresh-btn{
+    font-family:var(--font-sans);font-size:12.5px;font-weight:600;
+    background:var(--gold);color:var(--cover-navy-deep);border:none;border-radius:999px;
+    padding:7px 16px;cursor:pointer;
+  }
+  .refresh-btn:hover{background:var(--gold-light);}
+  .refresh-btn:disabled{opacity:.6;cursor:default;}
+
+  .card{background:var(--paper);border:1px solid var(--paper-line);border-radius:8px;padding:20px;margin-top:16px;}
+  .card h2{font-family:var(--font-serif);font-size:17px;margin:0 0 4px;font-weight:600;}
+  .card .hint{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;line-height:1.6;}
+
+  .leaderboard{display:flex;gap:14px;flex-wrap:wrap;}
+  .medal{flex:1;min-width:150px;background:var(--paper);border:1px solid var(--paper-line);border-radius:8px;padding:16px 14px;text-align:center;}
+  .medal .circle{width:44px;height:44px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-weight:700;color:#fff;font-size:16px;box-shadow:inset 0 0 0 2px rgba(255,255,255,0.4);}
+  .medal.gold .circle{background:linear-gradient(155deg,var(--gold-light),var(--gold));}
+  .medal.silver .circle{background:linear-gradient(155deg,#D7DCE1,var(--silver));}
+  .medal.bronze .circle{background:linear-gradient(155deg,#D79A6E,var(--bronze));}
+  .medal .mname{font-weight:600;font-size:14.5px;margin-bottom:2px;}
+  .medal .mno{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);margin-bottom:8px;}
+  .medal .mtotal{font-family:var(--font-mono);font-size:20px;font-weight:600;color:var(--cover-navy);}
+  .medal .mtotal small{font-family:var(--font-sans);font-size:11px;color:var(--ink-soft);font-weight:400;}
+
+  .search-row{margin-bottom:14px;}
+  .search-row input{width:100%;padding:9px 12px;border:1px solid var(--paper-line);border-radius:6px;font-family:var(--font-sans);font-size:14px;background:#fff;}
+
+  table.ledger{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.ledger thead th{text-align:left;font-weight:500;font-size:11.5px;color:var(--ink-soft);padding:0 8px 8px;border-bottom:1px solid var(--paper-line);}
+  table.ledger td{padding:10px 8px;border-bottom:1px solid var(--paper-line);}
+  table.ledger td.num, table.ledger th.num{font-family:var(--font-mono);text-align:right;}
+  table.ledger tr:last-child td{border-bottom:none;}
+  table.ledger td.total{font-family:var(--font-mono);font-weight:700;color:var(--cover-navy);}
+  .stu-name{font-weight:600;}
+  .stu-no{font-family:var(--font-mono);color:var(--ink-soft);font-size:12px;}
+
+  @media (max-width:660px){
+    table.ledger thead{display:none;}
+    table.ledger, table.ledger tbody, table.ledger tr, table.ledger td{display:block;width:100%;}
+    table.ledger tr{border:1px solid var(--paper-line);border-radius:8px;margin-bottom:10px;padding:10px 12px;background:#fff;}
+    table.ledger td{border:none;padding:4px 0;display:flex;justify-content:space-between;}
+    table.ledger td::before{content:attr(data-label);font-size:11.5px;color:var(--ink-soft);font-weight:500;}
+    table.ledger td.name-cell::before{content:none;}
+  }
+
+  .empty-state, .error-state, .loading-state{padding:40px 10px;text-align:center;color:var(--ink-soft);font-size:13.5px;line-height:1.8;}
+  .error-state{color:var(--stamp-red);}
+  .error-state code{background:var(--paper-2);padding:2px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px;color:var(--ink);}
+  .footnote{font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cover">
+    <p class="cover-eyebrow">HONOR BOARD · 即時同步</p>
+    <h1>班級榮譽榜</h1>
+    <p class="sub">資料直接來自導師維護的 Google 試算表，僅供查看；如需更新點數，請洽負責老師修改試算表。</p>
+    <div class="sync-row">
+      <button class="refresh-btn" id="refreshBtn">重新整理</button>
+      <span class="sync-status" id="syncStatus">尚未載入</span>
+    </div>
+  </div>
+
+  <div class="card" id="leaderboardCard" style="display:none;">
+    <h2>榮譽榜</h2>
+    <p class="hint">目前累積總點數最高的三位同學。</p>
+    <div class="leaderboard" id="leaderboardWrap"></div>
+  </div>
+
+  <div class="card">
+    <h2>學生名冊</h2>
+    <p class="hint" id="tableHint">正在載入資料…</p>
+    <div class="search-row"><input type="text" id="searchInput" placeholder="搜尋座號或姓名…" disabled></div>
+    <div id="tableWrap"><div class="loading-state">正在向試算表要資料，請稍候…</div></div>
+  </div>
+
+  <p class="footnote">此頁面為唯讀公開網頁，任何人皆可查看，無法在此修改任何資料。</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =======================================================================
+     設定區：請把下面這行換成你 Google 試算表「發布到網路」的 CSV 連結
+     取得方式：Google 試算表 → 檔案 → 共用 → 發布到網路 →
+       選擇分頁「名冊」→ 格式選「逗號分隔值 (.csv)」→ 發布 → 複製連結
+     連結長得像：
+     https://docs.google.com/spreadsheets/d/e/2PACX-xxxxxxx/pub?gid=0&single=true&output=csv
+  ========================================================================== */
+  var SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSbQ-n1It_corB7PD0LhHaZZ_KO3c_fd_uasMOMJ0zJ8RdEYG1aP2KntOKZhKcWob3Q0j4zChHgXUwh/pub?gid=509725191&single=true&output=csv";
+  var AUTO_REFRESH_MINUTES = 3;
+  /* ======================================================================= */
+
+  var NAME_COL = "姓名";
+  var NO_COL = "座號";
+  var TOTAL_COL = "總分";
+  var EXCLUDE_COLS = [NO_COL, NAME_COL, TOTAL_COL, "排名"];
+
+  function pad(n){ n = parseInt(n,10); return (isNaN(n)?String(n):(n<10?"0":"")+n); }
+  function esc(str){
+    return String(str==null?"":str).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function setStatus(text){
+    document.getElementById("syncStatus").textContent = text;
+  }
+
+  function showError(msg){
+    document.getElementById("leaderboardCard").style.display = "none";
+    document.getElementById("tableHint").textContent = "無法載入資料";
+    document.getElementById("searchInput").disabled = true;
+    document.getElementById("tableWrap").innerHTML =
+      '<div class="error-state">' + esc(msg) +
+      '<br><br>請確認：<br>1. 已在 Google 試算表完成「發布到網路」<br>' +
+      '2. 已把發布出來的 CSV 連結貼到網頁原始碼中的 <code>SHEET_CSV_URL</code><br>' +
+      '3. 網路連線是否正常</div>';
+  }
+
+  function detectCategoryColumns(fields){
+    return fields.filter(function(f){ return EXCLUDE_COLS.indexOf(f) === -1 && f !== ""; });
+  }
+
+  function parseRows(rows, categoryCols){
+    var students = rows.map(function(row){
+      var pts = {};
+      var total = 0;
+      categoryCols.forEach(function(c){
+        var v = parseFloat(row[c]);
+        if(isNaN(v)) v = 0;
+        pts[c] = v;
+        total += v;
+      });
+      return {
+        no: row[NO_COL] || "",
+        name: row[NAME_COL] || "",
+        points: pts,
+        total: total
+      };
+    }).filter(function(s){ return s.name !== ""; });
+
+    students.sort(function(a,b){
+      var na = parseFloat(a.no), nb = parseFloat(b.no);
+      if(!isNaN(na) && !isNaN(nb)) return na-nb;
+      return String(a.no).localeCompare(String(b.no));
+    });
+    return students;
+  }
+
+  function render(students, categoryCols){
+    renderLeaderboard(students);
+    window.__students = students;
+    window.__cats = categoryCols;
+    renderTable(students, categoryCols, "");
+    document.getElementById("searchInput").disabled = false;
+    document.getElementById("tableHint").textContent = "點擊搜尋框可依座號或姓名篩選。";
+  }
+
+  function renderLeaderboard(students){
+    var card = document.getElementById("leaderboardCard");
+    var wrap = document.getElementById("leaderboardWrap");
+    if(students.length === 0){ card.style.display = "none"; return; }
+    var top3 = students.slice().sort(function(a,b){ return b.total - a.total; }).slice(0,3);
+    var medals = [{cls:"gold",label:"1"},{cls:"silver",label:"2"},{cls:"bronze",label:"3"}];
+    var html = "";
+    top3.forEach(function(s,i){
+      var m = medals[i];
+      html += '<div class="medal '+m.cls+'">';
+      html += '<div class="circle">'+m.label+'</div>';
+      html += '<div class="mname">'+esc(s.name)+'</div>';
+      html += '<div class="mno">座號 '+esc(pad(s.no))+'</div>';
+      html += '<div class="mtotal">'+s.total+' <small>點</small></div>';
+      html += '</div>';
+    });
+    wrap.innerHTML = html;
+    card.style.display = "block";
+  }
+
+  function renderTable(students, categoryCols, query){
+    var wrap = document.getElementById("tableWrap");
+    var q = query.trim().toLowerCase();
+    var list = students.filter(function(s){
+      if(!q) return true;
+      return String(s.name).toLowerCase().indexOf(q) > -1 || String(s.no).indexOf(q) > -1;
+    });
+
+    if(list.length === 0){
+      wrap.innerHTML = '<div class="empty-state">找不到符合的學生，換個關鍵字看看。</div>';
+      return;
+    }
+
+    var html = '<table class="ledger"><thead><tr>';
+    html += '<th>座號</th><th>姓名</th>';
+    categoryCols.forEach(function(c){ html += '<th class="num">'+esc(c)+'</th>'; });
+    html += '<th class="num">總分</th></tr></thead><tbody>';
+    list.forEach(function(s){
+      html += '<tr>';
+      html += '<td class="stu-no name-cell" data-label="座號">'+esc(pad(s.no))+'</td>';
+      html += '<td class="stu-name name-cell" data-label="姓名">'+esc(s.name)+'</td>';
+      categoryCols.forEach(function(c){
+        html += '<td class="num" data-label="'+esc(c)+'">'+(s.points[c]||0)+'</td>';
+      });
+      html += '<td class="num total" data-label="總分">'+s.total+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function loadData(isManual){
+    if(!SHEET_CSV_URL || SHEET_CSV_URL.indexOf("PASTE_YOUR") > -1){
+      showError("尚未設定資料來源：請在網頁原始碼中的 SHEET_CSV_URL 貼上你 Google 試算表發布的 CSV 連結。");
+      setStatus("未設定資料來源");
+      return;
+    }
+    setStatus(isManual ? "更新中…" : "同步中…");
+    var btn = document.getElementById("refreshBtn");
+    btn.disabled = true;
+
+    var bust = (SHEET_CSV_URL.indexOf("?") > -1 ? "&" : "?") + "_=" + Date.now();
+    fetch(SHEET_CSV_URL + bust, { cache: "no-store" })
+      .then(function(res){
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function(csvText){
+        var parsed = Papa.parse(csvText, { header:true, skipEmptyLines:true });
+        if(!parsed.data || parsed.data.length === 0){
+          throw new Error("試算表目前沒有可讀取的資料列。");
+        }
+        var fields = parsed.meta.fields || [];
+        if(fields.indexOf(NAME_COL) === -1){
+          throw new Error("找不到「"+NAME_COL+"」欄位，請確認發布的分頁欄位名稱與範本一致。");
+        }
+        var categoryCols = detectCategoryColumns(fields);
+        var students = parseRows(parsed.data, categoryCols);
+        render(students, categoryCols);
+        var now = new Date();
+        setStatus("最後更新："+now.getHours()+":"+ (now.getMinutes()<10?"0":"") +now.getMinutes());
+      })
+      .catch(function(err){
+        showError("讀取試算表資料時發生錯誤：" + err.message);
+        setStatus("同步失敗");
+      })
+      .finally(function(){
+        btn.disabled = false;
+      });
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", function(){ loadData(true); });
+  document.getElementById("searchInput").addEventListener("input", function(e){
+    if(window.__students) renderTable(window.__students, window.__cats, e.target.value);
+  });
+
+  loadData(false);
+  if(AUTO_REFRESH_MINUTES > 0){
+    setInterval(function(){ loadData(false); }, AUTO_REFRESH_MINUTES * 60 * 1000);
+  }
+})();
+</script>
+</body>
+</html>
